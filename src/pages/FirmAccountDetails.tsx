@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { useControl } from '@/contexts/ControlContext';
 import { EditFirmTransactionDialog } from '@/components/EditFirmTransactionDialog';
 import { SendMoneyDialog } from '@/components/SendMoneyDialog';
+import { FirmAccountStatement } from '@/components/FirmAccountStatement';
 
 interface FirmAccount {
   id: string;
@@ -42,6 +43,7 @@ export default function FirmAccountDetails() {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [sendMoneyDialogOpen, setSendMoneyDialogOpen] = useState(false);
+  const [statementDialogOpen, setStatementDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   useEffect(() => {
@@ -254,7 +256,20 @@ export default function FirmAccountDetails() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Transaction History</CardTitle>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const statementDialog = document.querySelector('[data-statement-dialog]');
+                if (statementDialog) {
+                  (statementDialog as any).click();
+                }
+              }}
+            >
+              View Full Statement
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {transactions.length === 0 ? (
@@ -345,6 +360,20 @@ export default function FirmAccountDetails() {
         firmAccountId={account.id}
         firmAccountName={account.account_name}
         onMoneySent={handleTransactionUpdated}
+      />
+
+      <FirmAccountStatement
+        open={statementDialogOpen}
+        onOpenChange={setStatementDialogOpen}
+        accountId={account.id}
+        accountName={account.account_name}
+      />
+
+      {/* Hidden trigger for statement dialog */}
+      <button 
+        data-statement-dialog 
+        onClick={() => setStatementDialogOpen(true)} 
+        style={{ display: 'none' }}
       />
     </div>
   );

@@ -103,6 +103,12 @@ export function SendMoneyDialog({
     setLoading(true);
     try {
       const amount = parseFloat(formData.amount);
+      
+      // Map custom types to 'expense' for database compliance
+      let transactionType = formData.transaction_type;
+      if (transactionType.startsWith('custom_')) {
+        transactionType = 'expense';
+      }
 
       if (formData.recipient_type === 'partner') {
         // Create firm transaction for partner
@@ -111,7 +117,7 @@ export function SendMoneyDialog({
           .insert({
             firm_account_id: firmAccountId,
             partner_id: formData.recipient_id,
-            transaction_type: formData.transaction_type,
+            transaction_type: transactionType,
             amount: amount,
             transaction_date: formData.transaction_date,
             description: formData.description || `Money sent to partner from ${firmAccountName}`
@@ -126,7 +132,7 @@ export function SendMoneyDialog({
             firm_account_id: firmAccountId,
             mahajan_id: formData.recipient_id,
             partner_id: null,
-            transaction_type: formData.transaction_type,
+            transaction_type: transactionType,
             amount: amount,
             transaction_date: formData.transaction_date,
             description: formData.description || `Payment to mahajan: ${mahajans.find(m => m.id === formData.recipient_id)?.name} from ${firmAccountName}`
@@ -221,12 +227,8 @@ export function SendMoneyDialog({
                 <SelectItem value="expense">Expense</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
                 <SelectItem value="adjustment">Adjustment</SelectItem>
-                <SelectItem value="gst_tax_payment">GST Tax Payment</SelectItem>
-                <SelectItem value="income_tax_payment">Income Tax Payment</SelectItem>
-                <SelectItem value="paid_to_ca">Paid To CA</SelectItem>
-                <SelectItem value="paid_to_supplier">Paid To Supplier</SelectItem>
                 {customTypes.map((type) => (
-                  <SelectItem key={type.id} value={type.name.toLowerCase().replace(/\s+/g, '_')}>
+                  <SelectItem key={type.id} value={`custom_${type.id}`}>
                     {type.name}
                   </SelectItem>
                 ))}

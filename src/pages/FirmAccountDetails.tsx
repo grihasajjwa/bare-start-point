@@ -55,12 +55,16 @@ export default function FirmAccountDetails() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [typeSummary, setTypeSummary] = useState<Record<string, { count: number; total: number }>>({});
+  const [customTypes, setCustomTypes] = useState<Record<string, string>>({});
+  const [partners, setPartners] = useState<Record<string, string>>({});
   const itemsPerPage = 20;
 
   useEffect(() => {
     if (id) {
       fetchAccountDetails();
       fetchTransactions();
+      fetchCustomTypes();
+      fetchPartners();
     }
   }, [id]);
 
@@ -154,6 +158,42 @@ export default function FirmAccountDetails() {
     }
   };
 
+  const fetchCustomTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('custom_transaction_types')
+        .select('*');
+
+      if (error) throw error;
+      
+      const typesMap: Record<string, string> = {};
+      (data || []).forEach(type => {
+        typesMap[type.name.toLowerCase().replace(/\s+/g, '_')] = type.name;
+      });
+      setCustomTypes(typesMap);
+    } catch (error: any) {
+      console.error('Error fetching custom types:', error);
+    }
+  };
+
+  const fetchPartners = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('partners')
+        .select('id, name');
+
+      if (error) throw error;
+      
+      const partnersMap: Record<string, string> = {};
+      (data || []).forEach(partner => {
+        partnersMap[partner.id] = partner.name;
+      });
+      setPartners(partnersMap);
+    } catch (error: any) {
+      console.error('Error fetching partners:', error);
+    }
+  };
+
   const handleEditTransaction = (transaction: Transaction) => {
     if (!settings.allowEdit) {
       toast.error('Edit permission denied');
@@ -207,16 +247,37 @@ export default function FirmAccountDetails() {
     };
     
     if (labels[type]) return labels[type];
+    
+    // Check if it's a custom type
+    if (customTypes[type]) return customTypes[type];
+    
+    // Otherwise format snake_case to Title Case
     return type.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
+  };
+
+  const getTransactionDescription = (txn: Transaction) => {
+    const parts: string[] = [];
+    
+    // Add partner information if available
+    if (txn.partner_id && partners[txn.partner_id]) {
+      parts.push(`Money sent to ${partners[txn.partner_id]}`);
+    }
+    
+    // Add the transaction description/notes
+    if (txn.description) {
+      parts.push(txn.description);
+    }
+    
+    return parts.length > 0 ? parts.join(' - ') : '-';
   };
 
   // Filter transactions based on search and date
   const filteredTransactions = transactions.filter(txn => {
     const matchesSearch = searchQuery === '' || 
       getTransactionTypeLabel(txn.transaction_type).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (txn.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      getTransactionDescription(txn).toLowerCase().includes(searchQuery.toLowerCase()) ||
       txn.amount.toString().includes(searchQuery) ||
       format(new Date(txn.transaction_date), 'dd MMM yyyy').toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -271,7 +332,7 @@ export default function FirmAccountDetails() {
       body: filteredTransactions.map(txn => [
         format(new Date(txn.transaction_date), 'dd MMM yyyy'),
         getTransactionTypeLabel(txn.transaction_type),
-        txn.description || '-',
+        getTransactionDescription(txn),
         `${txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? '-' : '+'}₹${txn.amount.toFixed(2)}`
       ]),
       theme: 'striped',
@@ -290,7 +351,7 @@ export default function FirmAccountDetails() {
       filteredTransactions.map(txn => ({
         Date: format(new Date(txn.transaction_date), 'dd MMM yyyy'),
         Type: getTransactionTypeLabel(txn.transaction_type),
-        Description: txn.description || '-',
+        Description: getTransactionDescription(txn),
         Amount: txn.amount,
         'Amount Type': txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? 'Debit' : 'Credit'
       }))
@@ -462,7 +523,7 @@ export default function FirmAccountDetails() {
                       {getTransactionTypeLabel(transaction.transaction_type)}
                     </TableCell>
                     <TableCell className="max-w-md truncate">
-                      {transaction.description || '-'}
+                      {getTransactionDescription(transaction)}
                     </TableCell>
                     <TableCell className={`text-right font-medium ${
                       transaction.transaction_type === 'partner_withdrawal' || 

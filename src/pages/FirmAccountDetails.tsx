@@ -34,6 +34,7 @@ interface Transaction {
   transaction_type: string;
   amount: number;
   partner_id: string | null;
+  mahajan_id: string | null;
   description: string | null;
   transaction_date: string;
   created_at: string;
@@ -57,6 +58,7 @@ export default function FirmAccountDetails() {
   const [typeSummary, setTypeSummary] = useState<Record<string, { count: number; total: number }>>({});
   const [customTypes, setCustomTypes] = useState<Record<string, string>>({});
   const [partners, setPartners] = useState<Record<string, string>>({});
+  const [mahajans, setMahajans] = useState<Record<string, string>>({});
   const itemsPerPage = 20;
 
   useEffect(() => {
@@ -65,6 +67,7 @@ export default function FirmAccountDetails() {
       fetchTransactions();
       fetchCustomTypes();
       fetchPartners();
+      fetchMahajans();
     }
   }, [id]);
 
@@ -194,6 +197,24 @@ export default function FirmAccountDetails() {
     }
   };
 
+  const fetchMahajans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('mahajans')
+        .select('id, name');
+
+      if (error) throw error;
+      
+      const mahajansMap: Record<string, string> = {};
+      (data || []).forEach(mahajan => {
+        mahajansMap[mahajan.id] = mahajan.name;
+      });
+      setMahajans(mahajansMap);
+    } catch (error: any) {
+      console.error('Error fetching mahajans:', error);
+    }
+  };
+
   const handleEditTransaction = (transaction: Transaction) => {
     if (!settings.allowEdit) {
       toast.error('Edit permission denied');
@@ -262,15 +283,20 @@ export default function FirmAccountDetails() {
     
     // Add partner information if available
     if (txn.partner_id && partners[txn.partner_id]) {
-      parts.push(`Money sent to ${partners[txn.partner_id]}`);
+      parts.push(`Partner: ${partners[txn.partner_id]}`);
+    }
+    
+    // Add mahajan information if available
+    if (txn.mahajan_id && mahajans[txn.mahajan_id]) {
+      parts.push(`Mahajan: ${mahajans[txn.mahajan_id]}`);
     }
     
     // Add the transaction description/notes
     if (txn.description) {
-      parts.push(txn.description);
+      parts.push(`Notes: ${txn.description}`);
     }
     
-    return parts.length > 0 ? parts.join(' - ') : '-';
+    return parts.length > 0 ? parts.join(', ') : '-';
   };
 
   // Filter transactions based on search and date

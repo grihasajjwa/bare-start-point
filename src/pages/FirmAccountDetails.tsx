@@ -3,14 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Edit, Trash2, Send } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Send, Download, FileSpreadsheet, Search, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useControl } from '@/contexts/ControlContext';
 import { EditFirmTransactionDialog } from '@/components/EditFirmTransactionDialog';
 import { SendMoneyDialog } from '@/components/SendMoneyDialog';
-import { FirmAccountStatement } from '@/components/FirmAccountStatement';
+import { Input } from '@/components/ui/input';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { PDFDownloader } from '@/lib/pdf-download';
+import * as XLSX from 'xlsx';
+import { CustomTransactionTypeManager } from '@/components/CustomTransactionTypeManager';
 
 interface FirmAccount {
   id: string;
@@ -43,8 +48,14 @@ export default function FirmAccountDetails() {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [sendMoneyDialogOpen, setSendMoneyDialogOpen] = useState(false);
-  const [statementDialogOpen, setStatementDialogOpen] = useState(false);
+  const [customTypeDialogOpen, setCustomTypeDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [typeSummary, setTypeSummary] = useState<Record<string, { count: number; total: number }>>({});
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (id) {
@@ -126,6 +137,17 @@ export default function FirmAccountDetails() {
 
       if (error) throw error;
       setTransactions(data || []);
+      
+      // Calculate summary by type
+      const summary: Record<string, { count: number; total: number }> = {};
+      (data || []).forEach(txn => {
+        if (!summary[txn.transaction_type]) {
+          summary[txn.transaction_type] = { count: 0, total: 0 };
+        }
+        summary[txn.transaction_type].count++;
+        summary[txn.transaction_type].total += txn.amount;
+      });
+      setTypeSummary(summary);
     } catch (error: any) {
       console.error('Error fetching transactions:', error);
       toast.error('Failed to load transactions');
@@ -184,13 +206,100 @@ export default function FirmAccountDetails() {
       paid_to_supplier: 'Paid To Supplier'
     };
     
-    // If it's a known type, return the label
     if (labels[type]) return labels[type];
-    
-    // Otherwise, format the snake_case to Title Case for custom types
     return type.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
+  };
+
+  // Filter transactions based on search and date
+  const filteredTransactions = transactions.filter(txn => {
+    const matchesSearch = searchQuery === '' || 
+      getTransactionTypeLabel(txn.transaction_type).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (txn.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      txn.amount.toString().includes(searchQuery) ||
+      format(new Date(txn.transaction_date), 'dd MMM yyyy').toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesDateRange = 
+      (!startDate || new Date(txn.transaction_date) >= new Date(startDate)) &&
+      (!endDate || new Date(txn.transaction_date) <= new Date(endDate));
+    
+    return matchesSearch && matchesDateRange;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, startDate, endDate]);
+
+  const handleExportPDF = async () => {
+    if (!account) return;
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    doc.setFontSize(18);
+    doc.text('Firm Account Statement', pageWidth / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`Account: ${account.account_name}`, 14, 25);
+    doc.text(`Type: ${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)}`, 14, 32);
+    doc.text(`Current Balance: ₹${account.current_balance.toFixed(2)}`, 14, 39);
+    
+    let yPos = 50;
+    doc.setFontSize(14);
+    doc.text('Transaction Summary', 14, yPos);
+    yPos += 7;
+    
+    doc.setFontSize(10);
+    Object.entries(typeSummary).forEach(([type, data]) => {
+      doc.text(`${getTransactionTypeLabel(type)}: ${data.count} transactions, ₹${data.total.toFixed(2)}`, 14, yPos);
+      yPos += 6;
+    });
+    
+    yPos += 5;
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Date', 'Type', 'Description', 'Amount']],
+      body: filteredTransactions.map(txn => [
+        format(new Date(txn.transaction_date), 'dd MMM yyyy'),
+        getTransactionTypeLabel(txn.transaction_type),
+        txn.description || '-',
+        `${txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? '-' : '+'}₹${txn.amount.toFixed(2)}`
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] }
+    });
+    
+    const pdfBlob = doc.output('blob');
+    await PDFDownloader.downloadPDF(pdfBlob, `${account.account_name}_statement.pdf`);
+    toast.success('PDF exported successfully');
+  };
+
+  const handleExportExcel = () => {
+    if (!account) return;
+    
+    const ws = XLSX.utils.json_to_sheet(
+      filteredTransactions.map(txn => ({
+        Date: format(new Date(txn.transaction_date), 'dd MMM yyyy'),
+        Type: getTransactionTypeLabel(txn.transaction_type),
+        Description: txn.description || '-',
+        Amount: txn.amount,
+        'Amount Type': txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? 'Debit' : 'Credit'
+      }))
+    );
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+    XLSX.writeFile(wb, `${account.account_name}_statement.xlsx`);
+    toast.success('Excel exported successfully');
   };
 
   if (loading) {
@@ -210,10 +319,16 @@ export default function FirmAccountDetails() {
           </Button>
           <h1 className="text-3xl font-bold">Account Statement - {account.account_name}</h1>
         </div>
-        <Button onClick={() => setSendMoneyDialogOpen(true)}>
-          <Send className="h-4 w-4 mr-2" />
-          Send Money
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCustomTypeDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Manage Types
+          </Button>
+          <Button onClick={() => setSendMoneyDialogOpen(true)}>
+            <Send className="h-4 w-4 mr-2" />
+            Send Money
+          </Button>
+        </div>
       </div>
 
       <Card className="mb-6">
@@ -254,43 +369,91 @@ export default function FirmAccountDetails() {
         </CardContent>
       </Card>
 
+      {/* Transaction Summary Cards */}
+      {Object.keys(typeSummary).length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+          {Object.entries(typeSummary).map(([type, data]) => (
+            <Card key={type}>
+              <CardContent className="pt-6">
+                <div className="text-sm text-muted-foreground mb-1">
+                  {getTransactionTypeLabel(type)}
+                </div>
+                <div className="text-2xl font-bold">₹{data.total.toFixed(2)}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {data.count} transaction{data.count !== 1 ? 's' : ''}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Transaction History</CardTitle>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                const statementDialog = document.querySelector('[data-statement-dialog]');
-                if (statementDialog) {
-                  (statementDialog as any).click();
-                }
-              }}
-            >
-              View Full Statement
-            </Button>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <CardTitle>Transaction History</CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Excel
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by type, description, amount, or date..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  placeholder="Start Date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-40"
+                />
+                <Input
+                  type="date"
+                  placeholder="End Date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {transactions.length === 0 ? (
+          {filteredTransactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No transactions found for this account
+              {transactions.length === 0 ? 'No transactions found for this account' : 'No transactions match your search criteria'}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  {(settings.allowEdit || settings.allowDelete) && (
-                    <TableHead className="text-right">Actions</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((transaction) => (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    {(settings.allowEdit || settings.allowDelete) && (
+                      <TableHead className="text-right">Actions</TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>
                       {format(new Date(transaction.transaction_date), 'dd MMM yyyy')}
@@ -340,9 +503,40 @@ export default function FirmAccountDetails() {
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -362,18 +556,9 @@ export default function FirmAccountDetails() {
         onMoneySent={handleTransactionUpdated}
       />
 
-      <FirmAccountStatement
-        open={statementDialogOpen}
-        onOpenChange={setStatementDialogOpen}
-        accountId={account.id}
-        accountName={account.account_name}
-      />
-
-      {/* Hidden trigger for statement dialog */}
-      <button 
-        data-statement-dialog 
-        onClick={() => setStatementDialogOpen(true)} 
-        style={{ display: 'none' }}
+      <CustomTransactionTypeManager
+        open={customTypeDialogOpen}
+        onOpenChange={setCustomTypeDialogOpen}
       />
     </div>
   );

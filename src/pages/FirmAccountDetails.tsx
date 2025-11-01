@@ -171,7 +171,11 @@ export default function FirmAccountDetails() {
       
       const typesMap: Record<string, string> = {};
       (data || []).forEach(type => {
-        typesMap[type.name.toLowerCase().replace(/\s+/g, '_')] = type.name;
+        // Store with the exact name as key
+        typesMap[type.name] = type.name;
+        // Also store snake_case version
+        const snakeCase = type.name.toLowerCase().replace(/\s+/g, '_');
+        typesMap[snakeCase] = type.name;
       });
       setCustomTypes(typesMap);
     } catch (error: any) {
@@ -254,6 +258,7 @@ export default function FirmAccountDetails() {
   };
 
   const getTransactionTypeLabel = (type: string) => {
+    // First check predefined types
     const labels: Record<string, string> = {
       partner_deposit: 'Partner Deposit',
       partner_withdrawal: 'Partner Withdrawal',
@@ -269,10 +274,10 @@ export default function FirmAccountDetails() {
     
     if (labels[type]) return labels[type];
     
-    // Check if it's a custom type
+    // Check if it's a custom type (exact match or snake_case match)
     if (customTypes[type]) return customTypes[type];
     
-    // Otherwise format snake_case to Title Case
+    // Format snake_case to Title Case as fallback
     return type.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');

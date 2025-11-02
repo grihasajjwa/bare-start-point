@@ -176,7 +176,8 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
   const calculateLoanBalance = (loan: any) => {
     const loanTransactions = allTransactions.filter(t => t.loan_id === loan.id);
     const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    return loan.principal_amount - totalPaid;
+    const loanAmount = loan.total_outstanding || loan.principal_amount;
+    return loanAmount - totalPaid;
   };
 
   const calculateInterest = (loan: any, balance: number) => {

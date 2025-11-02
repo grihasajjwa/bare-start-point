@@ -36,6 +36,8 @@ interface Customer {
 interface Loan {
   id: string;
   principal_amount: number;
+  processing_fee?: number;
+  total_outstanding?: number;
   interest_rate: number | null;
   interest_type: string | null;
   loan_date: string;
@@ -279,6 +281,16 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
                       <Badge variant="secondary">
                         {formatCurrency(loan.principal_amount)}
                       </Badge>
+                      {loan.processing_fee && loan.processing_fee > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Processing Fee: {formatCurrency(loan.processing_fee)}
+                        </p>
+                      )}
+                      {loan.total_outstanding && (
+                        <p className="text-sm font-semibold text-orange-600 mt-1">
+                          Total Outstanding: {formatCurrency(loan.total_outstanding)}
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground mt-1">
                         Balance: {formatCurrency(balance)}
                       </p>

@@ -91,12 +91,18 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
 
     setLoading(true);
     try {
+      const processingFeeAmount = formData.processingFee ? parseFloat(formData.processingFee) : 0;
+      const principalAmountValue = parseFloat(formData.principalAmount);
+      const totalOutstandingValue = principalAmountValue + processingFeeAmount;
+      
       const { error } = await supabase
         .from('loans')
         .insert({
           user_id: user.id,
           customer_id: formData.customerId,
-          principal_amount: parseFloat(formData.principalAmount),
+          principal_amount: principalAmountValue,
+          processing_fee: processingFeeAmount,
+          total_outstanding: totalOutstandingValue,
           description: formData.description,
           interest_rate: formData.interestType === 'none' ? 0 : parseFloat(formData.interestRate),
           interest_type: formData.interestType,

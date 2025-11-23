@@ -20,12 +20,18 @@ import Partners from "./pages/Partners";
 import PartnerDetails from "./pages/PartnerDetails";
 import FirmAccounts from "./pages/FirmAccounts";
 import FirmAccountDetails from "./pages/FirmAccountDetails";
+import FirmAccountTransactionTypeDetails from "./pages/FirmAccountTransactionTypeDetails";
 import TransactionTypes from "./pages/TransactionTypes";
 import CollectionReport from "./pages/reports/CollectionReport";
 import DisbursedReport from "./pages/reports/DisbursedReport";
 import SalesReport from "./pages/reports/SalesReport";
 import ActiveLoansReport from "./pages/reports/ActiveLoansReport";
+import AdmissionEnquiry from "./pages/AdmissionEnquiry";
+import Cheques from "./pages/Cheques";
+import ChequeReminders from "./pages/ChequeReminders";
+import ChequeReconciliation from "./pages/ChequeReconciliation";
 import NotFound from "./pages/NotFound";
+
 
 const queryClient = new QueryClient();
 
@@ -149,6 +155,11 @@ const AppRoutes = () => {
           <FirmAccountDetails />
         </ProtectedRoute>
       } />
+      <Route path="/firm-accounts/:id/type-details" element={
+        <ProtectedRoute>
+          <FirmAccountTransactionTypeDetails />
+        </ProtectedRoute>
+      } />
       <Route path="/transaction-types" element={
         <ProtectedRoute>
           <TransactionTypes />
@@ -172,6 +183,26 @@ const AppRoutes = () => {
       <Route path="/reports/active-loans" element={
         <ProtectedRoute>
           <ActiveLoansReport />
+        </ProtectedRoute>
+      } />
+      <Route path="/admission-enquiry" element={
+        <ProtectedRoute>
+          <AdmissionEnquiry />
+        </ProtectedRoute>
+      } />
+      <Route path="/cheques" element={
+        <ProtectedRoute>
+          <Cheques />
+        </ProtectedRoute>
+      } />
+      <Route path="/cheque-reminders" element={
+        <ProtectedRoute>
+          <ChequeReminders />
+        </ProtectedRoute>
+      } />
+      <Route path="/cheque-reconciliation" element={
+        <ProtectedRoute>
+          <ChequeReconciliation />
         </ProtectedRoute>
       } />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

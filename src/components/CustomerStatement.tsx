@@ -194,11 +194,22 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   };
 
   const calculateLoanBalance = (loanId: string) => {
-    const loanTransactions = transactions.filter(t => t.loan_id === loanId);
-    const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const loan = loans.find(l => l.id === loanId);
-    return loan ? loan.principal_amount - totalPaid : 0;
-  };
+  const loan = loans.find(l => l.id === loanId);
+  if (!loan) return 0;
+
+  const loanTransactions = transactions.filter(t => t.loan_id === loanId);
+  const totalCollected = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+  // Total disbursed = principal + processing fee (if exists)
+  const totalDisbursed = (loan.total_outstanding ?? 0) > 0
+    ? loan.total_outstanding
+    : loan.principal_amount + (loan.processing_fee || 0);
+
+  const remaining = totalDisbursed - totalCollected;
+  return remaining > 0 ? remaining : 0; // prevent negative balances
+};
+
+
 
   const calculateInterest = (loan: Loan, balance: number) => {
     if (!loan.interest_rate || loan.interest_type === 'none') return 0;

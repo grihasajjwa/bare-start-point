@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, TrendingUp, Clock, CheckCircle, XCircle, Bell, FileText } from 'lucide-react';
+import { Plus, Edit, Trash2, TrendingUp, Clock, CheckCircle, XCircle, Bell, FileText, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -20,6 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { AddChequeDialog } from '@/components/AddChequeDialog';
 import { EditChequeDialog } from '@/components/EditChequeDialog';
+import { ChequeStatusHistory } from '@/components/ChequeStatusHistory';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +60,7 @@ export default function Cheques() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedCheque, setSelectedCheque] = useState<Cheque | null>(null);
   const [chequeType, setChequeType] = useState<'received' | 'issued'>('received');
 
@@ -178,6 +180,17 @@ export default function Cheques() {
               <TableCell>{getStatusBadge(cheque.status)}</TableCell>
               <TableCell>
                 <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setSelectedCheque(cheque);
+                      setHistoryDialogOpen(true);
+                    }}
+                    title="View Status History"
+                  >
+                    <History className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -378,6 +391,15 @@ export default function Cheques() {
           onOpenChange={setEditDialogOpen}
           cheque={selectedCheque}
           onSuccess={fetchCheques}
+        />
+      )}
+
+      {selectedCheque && (
+        <ChequeStatusHistory
+          open={historyDialogOpen}
+          onOpenChange={setHistoryDialogOpen}
+          chequeId={selectedCheque.id}
+          chequeNumber={selectedCheque.cheque_number}
         />
       )}
 

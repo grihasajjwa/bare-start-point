@@ -28,6 +28,7 @@ import SalesReport from "./pages/reports/SalesReport";
 import ActiveLoansReport from "./pages/reports/ActiveLoansReport";
 import AdmissionEnquiry from "./pages/AdmissionEnquiry";
 import Cheques from "./pages/Cheques";
+import ChequeWeeklyView from "./pages/ChequeWeeklyView";
 import ChequeReminders from "./pages/ChequeReminders";
 import ChequeReconciliation from "./pages/ChequeReconciliation";
 import NotFound from "./pages/NotFound";
@@ -193,6 +194,11 @@ const AppRoutes = () => {
       <Route path="/cheques" element={
         <ProtectedRoute>
           <Cheques />
+        </ProtectedRoute>
+      } />
+      <Route path="/cheques/weekly" element={
+        <ProtectedRoute>
+          <ChequeWeeklyView />
         </ProtectedRoute>
       } />
       <Route path="/cheque-reminders" element={

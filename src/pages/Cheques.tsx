@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, TrendingUp, Clock, CheckCircle, XCircle, Bell, FileText, History } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Edit, Trash2, TrendingUp, Clock, CheckCircle, XCircle, Bell, FileText, History, CalendarDays } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { supabase } from '@/integrations/supabase/client';
@@ -284,6 +284,24 @@ export default function Cheques() {
         </header>
 
         <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+          {/* Weekly View Card */}
+          <Card 
+            className="cursor-pointer hover:bg-accent transition-colors border-primary/20"
+            onClick={() => navigate('/cheques/weekly')}
+          >
+            <CardHeader>
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <CalendarDays className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Weekly Cheque Status</CardTitle>
+                  <CardDescription>View cheques organized by week with detailed status tracking</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+
           {/* Summary Cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
